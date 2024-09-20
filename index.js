@@ -2,10 +2,12 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const NodeCache = require('node-cache');
 const { ChromaClient, OpenAIEmbeddingFunction } = require('chromadb');
 const OpenAI = require("openai");
 
 const app = express();
+const cache = new NodeCache(); // Initialize cache
 
 // Middleware
 app.use(cors({
@@ -162,11 +164,13 @@ app.post("/charactername", async (req, res) => {
         const { story } = req.body;
         const cacheKey = `character_names_${story.substring(0, 50)}`;
 
+        // Check the cache for previously extracted character names
         const cachedNames = cache.get(cacheKey);
         if (cachedNames) {
             return res.status(200).json({ response: cachedNames });
         }
 
+        // Call OpenAI to extract character names
         const completion = await openai.chat.completions.create({
             model: "gpt-4",
             messages: [
@@ -175,6 +179,7 @@ app.post("/charactername", async (req, res) => {
             ],
         });
 
+        // Extract and cache the character names
         const characterNames = completion.choices[0].message.content.trim();
         cache.set(cacheKey, characterNames);
         res.status(200).json({ response: characterNames });
@@ -190,11 +195,13 @@ app.post('/ask', async (req, res) => {
         const { query, characterName, summarizedStory } = req.body;
         const cacheKey = `response_${query.substring(0, 50)}_${characterName}_${summarizedStory.substring(0, 50)}`;
 
+        // Check the cache for previously processed responses
         const cachedResponse = cache.get(cacheKey);
         if (cachedResponse) {
             return res.status(200).json({ response: cachedResponse });
         }
 
+        // Call OpenAI to generate a character response
         const completion = await openai.chat.completions.create({
             model: "gpt-4",
             messages: [
@@ -218,6 +225,7 @@ app.get("/", (req, res) => {
     res.send("Server is running.");
 });
 
+// Start the server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
