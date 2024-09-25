@@ -3,7 +3,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const NodeCache = require('node-cache');
-const { ChromaClient, OpenAIEmbeddingFunction } = require('chromadb');
 const OpenAI = require("openai");
 
 const app = express();
@@ -33,62 +32,14 @@ const storySchema = new mongoose.Schema({
 });
 const Story = mongoose.model('Story', storySchema);
 
-// Initialize ChromaDB
-const chromaClient = new ChromaClient({ path: process.env.CHROMA_CLIENT_PATH });
-const embedder = new OpenAIEmbeddingFunction({ openai_api_key: process.env.OPENAI_API_KEY });
-let collection;
 
-// Initialize or get collection
-(async () => {
-    try {
-        collection = await chromaClient.getOrCreateCollection({
-            name: "story_summaries",
-            embeddingFunction: embedder
-        });
-        console.log("Collection initialized or fetched successfully.");
-    } catch (error) {
-        console.error("Error initializing or fetching the collection:", error);
-    }
-})();
 
 // Initialize OpenAI
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Helper Functions
-function chunkStory(story, maxChunkSize = 1000) {
-    const words = story.split(' ');
-    const chunks = [];
-    let currentChunk = '';
 
-    for (const word of words) {
-        if ((currentChunk + ' ' + word).length <= maxChunkSize) {
-            currentChunk += (currentChunk ? ' ' : '') + word;
-        } else {
-            chunks.push(currentChunk);
-            currentChunk = word;
-        }
-    }
-    if (currentChunk) {
-        chunks.push(currentChunk);
-    }
-    return chunks;
-}
 
 async function summarizeStory(story) {
-    const chunks = chunkStory(story);
-    let fullSummary = '';
-
-    for (const chunk of chunks) {
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4",
-            messages: [
-                { role: "system", content: "You are a helpful assistant who will summarize information concisely." },
-                { role: "user", content: `Please summarize the following text: "${chunk}"` },
-            ],
-        });
-        fullSummary += completion.choices[0].message.content.trim() + ' ';
-    }
-
     // Final summarization of the combined summaries
     const finalCompletion = await openai.chat.completions.create({
         model: "gpt-4",
@@ -120,13 +71,6 @@ app.post('/submitStory', async (req, res) => {
             const summary = await summarizeStory(story);
             storyDoc.summary = summary;
             await storyDoc.save();
-
-            // Save to ChromaDB as well
-            await collection.add({
-                ids: [storyDoc._id.toString()],
-                documents: [summary],
-                metadatas: [{ original_story: story.substring(0, 1000) + '...' }]
-            });
 
         }, 0); // Run asynchronously
 
