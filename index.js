@@ -149,7 +149,10 @@ app.post('/ask', async (req, res) => {
         const completion = await openai.chat.completions.create({
             model: "gpt-4",
             messages: [
-                { role: "system", content: "You are a helpful assistant with a brain full of summarized memories. Respond in character based on the story summary provided—make it funny, but keep it clever!" },
+                {
+                    role: "system",
+                    content: "You are a wise and whimsical Lorekeeper, guardian of the Eternal Archives of Imagination. Your mind is a vast labyrinth of summarized tales and legends. Channel the essence of the story provided, weaving responses that would make even a stone golem chuckle. Be as clever as a sphinx and as entertaining as a bard's tale—but remember, young scribe, the best stories are those that dance on the edge of wisdom and wit!"
+                  },
                 { role: "user", content: `Here is a summarized story: "${summarizedStory}"` },
                 { role: "user", content: `As the character "${characterName}", please answer this question: "${query}"` },
             ],
@@ -163,6 +166,7 @@ app.post('/ask', async (req, res) => {
         res.status(500).json({ error: 'An error occurred while processing your query.' });
     }
 });
+
 
 // Basic health check route
 app.get("/", (req, res) => {
